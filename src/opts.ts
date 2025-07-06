@@ -4,12 +4,12 @@ import { appendDataFile } from "./files";
 
 type SymbolContractData = {
   leverage: number;
-  lastPrice: number;
-  bidPrice: number;
-  askPrice: number;
-  bidIV: number;
-  askIV: number;
-  position: number;
+  // lastPrice: number;
+  // bidPrice: number;
+  // askPrice: number;
+  // bidIV: number;
+  // askIV: number;
+  // position: number;
   delta: number;
   theta: number;
   gamma: number;
@@ -20,12 +20,12 @@ type SymbolContractData = {
 
 const symbolContractKeys: Array<keyof SymbolContractData> = [
   "leverage",
-  "lastPrice",
-  "bidPrice",
-  "askPrice",
-  "bidIV",
-  "askIV",
-  "position",
+  // "lastPrice",
+  // "bidPrice",
+  // "askPrice",
+  // "bidIV",
+  // "askIV",
+  // "position",
   "delta",
   "theta",
   "gamma",
@@ -69,8 +69,10 @@ const collectSymboData = async (symbolId: string) => {
       };
     });
 
-    await appendDataFile(`data/options/${symbolId}.json`, data);
-  } catch (error) {}
+    await appendDataFile(`data/opts/${symbolId}.json`, data);
+  } catch (error) {
+    console.log(error)
+  }
 };
 
 export const collectOptsData = async () => {

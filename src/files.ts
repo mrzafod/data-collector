@@ -1,16 +1,20 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { minTime, time } from "./conf";
+import path from "node:path";
+
+const PROJECT_ROOT = path.resolve(__dirname, "..");
 
 export const appendDataFile = async (
-  filePath: string,
+  fileRelativePath: string,
   appendData: any[] = []
 ) => {
+  const filePath = path.join(PROJECT_ROOT, fileRelativePath);
   let fileData = [];
   try {
     const raw = readFileSync(filePath, "utf8");
     fileData = JSON.parse(raw);
-  } catch (e: any) {
-    if (e.code !== "ENOENT") throw e;
+  } catch (error) {
+    console.log(error);
   }
 
   const jsonArray =
