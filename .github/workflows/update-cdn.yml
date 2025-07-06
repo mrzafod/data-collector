@@ -1,8 +1,8 @@
-name: Update CDN Data
+name: Update CDN
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour UTC
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout main branch with source code
       - name: Checkout main
         uses: actions/checkout@v4
 
@@ -19,27 +18,28 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm install
+      - run: npm ci
+      - run: npx tsc
+      - run: node dist/index.js
 
-      - name: Compile TypeScript
-        run: npx tsc
-
-      # Checkout the cdn branch to subdirectory
+      # Checkout cdn branch to separate folder
       - name: Checkout cdn branch
         uses: actions/checkout@v4
         with:
           ref: cdn
-          path: cdn
+          path: cdn-branch
 
-      - name: Run update script
-        run: node dist/index.js cdn
-
-      - name: Commit and push to cdn
+      # Copy data to cdn branch folder
+      - name: Copy data to cdn
         run: |
-          cd cdn
+          rm -rf cdn-branch/data
+          cp -r data cdn-branch/data
+
+      - name: Commit and push
+        run: |
+          cd cdn-branch
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
+          git add data
           git commit -m "Update data at $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes"
           git push origin cdn
