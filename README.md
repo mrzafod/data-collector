@@ -25,6 +25,9 @@ The frontend dashboard is powered by Observable notebooks:
 
 > Want to explore the live dashboards? Coming soon as a public Observable notebook!
 
+![Dashboard Screenshot 1](./static/screen01.png)
+![Dashboard Screenshot 1](./static/screen02.png)
+
 ## Use Cases
 
 - Researching volatility behavior on Binance Options.
