@@ -1,15 +1,16 @@
-name: Update Data
+name: Update CDN
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 * * * *' # every hour
   workflow_dispatch:
 
 jobs:
-  update-data:
+  update-cdn:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout main (your app lives here)
       - name: Checkout main
         uses: actions/checkout@v4
 
@@ -18,14 +19,36 @@ jobs:
         with:
           node-version: 20
 
+      # 2. Checkout cdn branch separately (just for its /data)
+      - name: Checkout cdn branch
+        uses: actions/checkout@v4
+        with:
+          ref: cdn
+          path: cdn-branch
+
+      # 3. Copy /data from cdn to main working directory
+      - name: Copy data from cdn to main
+        run: |
+          rm -rf data
+          cp -r cdn-branch/data data
+
+      # 4. Build & run app — it will update /data
       - run: npm ci
       - run: npx tsc
       - run: node dist/index.js
 
-      - name: Commit and push data
+      # 5. Copy updated /data back to cdn-branch folder
+      - name: Copy updated data to cdn branch
         run: |
+          rm -rf cdn-branch/data
+          cp -r data cdn-branch/data
+
+      # 6. Commit and push to cdn branch
+      - name: Commit and push to cdn
+        run: |
+          cd cdn-branch
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data
           git commit -m "Update data at $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes"
-          git push origin main
+          git push origin cdn
