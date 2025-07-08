@@ -1,4 +1,4 @@
-name: Update CDN
+name: Update Data
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  update-cdn:
+  update-data:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,24 +22,10 @@ jobs:
       - run: npx tsc
       - run: node dist/index.js
 
-      # Checkout cdn branch to separate folder
-      - name: Checkout cdn branch
-        uses: actions/checkout@v4
-        with:
-          ref: cdn
-          path: cdn-branch
-
-      # Copy data to cdn branch folder
-      - name: Copy data to cdn
+      - name: Commit and push data
         run: |
-          rm -rf cdn-branch/data
-          cp -r data cdn-branch/data
-
-      - name: Commit and push
-        run: |
-          cd cdn-branch
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data
           git commit -m "Update data at $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes"
-          git push origin cdn
+          git push origin main

@@ -17,11 +17,13 @@ export const appendDataFile = async (
     console.log(error);
   }
 
+  console.log(fileRelativePath, new Date(time), new Date(minTime))
+
   const jsonArray =
     "[\n" +
     appendData
       .map((d) => Object.assign({ time }, d))
-      .concat(fileData.filter((d: any) => d.time >= minTime))
+      .concat(fileData.filter((d: any) => d.time >= minTime && d.time < time))
       .map((item) => "  " + JSON.stringify(item))
       .join(",\n") +
     "\n]";
