@@ -7,8 +7,8 @@ type SymbolContractData = {
   // lastPrice: number;
   // bidPrice: number;
   // askPrice: number;
-  // bidIV: number;
-  // askIV: number;
+  bidIV: number;
+  askIV: number;
   // position: number;
   delta: number;
   theta: number;
@@ -23,8 +23,8 @@ const symbolContractKeys: Array<keyof SymbolContractData> = [
   // "lastPrice",
   // "bidPrice",
   // "askPrice",
-  // "bidIV",
-  // "askIV",
+  "bidIV",
+  "askIV",
   // "position",
   "delta",
   "theta",
