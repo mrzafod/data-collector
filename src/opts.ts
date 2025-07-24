@@ -20,12 +20,8 @@ type SymbolContractData = {
 
 const symbolContractKeys: Array<keyof SymbolContractData> = [
   "leverage",
-  // "lastPrice",
-  // "bidPrice",
-  // "askPrice",
   "bidIV",
   "askIV",
-  // "position",
   "delta",
   "theta",
   "gamma",

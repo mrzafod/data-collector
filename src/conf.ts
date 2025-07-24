@@ -9,5 +9,5 @@ export const symbols: Array<{ id: string; tick: number }> = [
   { id: "DOGEUSDT", tick: 0.002 },
 ];
 
-export const time = tfClamp("1h");
+export const time = tfClamp("15m");
 export const minTime = tfClamp("1d", time, -7);
