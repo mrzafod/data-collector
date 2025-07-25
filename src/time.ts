@@ -1,10 +1,10 @@
 const ms = { m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
 
-export const tfMs = (tf: string): number => {
+export const tfMs = (tf: string, numTfs: number = 1): number => {
   const num = parseInt(tf);
-  if (tf.endsWith('m')) return num * ms.m;
-  if (tf.endsWith('h')) return num * ms.h;
-  if (tf.endsWith('d')) return num * ms.d;
+  if (tf.endsWith("m")) return num * ms.m * numTfs;
+  if (tf.endsWith("h")) return num * ms.h * numTfs;
+  if (tf.endsWith("d")) return num * ms.d * numTfs;
   throw new Error(`Unsupported timeframe: ${tf}`);
 };
 
@@ -27,4 +27,4 @@ export const tfDist = (
 };
 
 export const ftime = (v: number | Date = new Date()) =>
-  new Date(v).toJSON().substring(0, 16).replace('T', ' ');
+  new Date(v).toJSON().substring(0, 16).replace("T", " ");

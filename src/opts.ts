@@ -1,15 +1,12 @@
-import { minBy, pick } from "lodash";
-import { symbols } from "./conf";
+import { sortBy, keyBy, union } from "lodash";
+import { symbols, time } from "./conf";
 import { appendDataFile } from "./files";
+import { tfMs } from "./time";
 
-type SymbolContractData = {
+type ContractMetrics = {
   leverage: number;
-  // lastPrice: number;
-  // bidPrice: number;
-  // askPrice: number;
   bidIV: number;
   askIV: number;
-  // position: number;
   delta: number;
   theta: number;
   gamma: number;
@@ -18,7 +15,25 @@ type SymbolContractData = {
   amount: number;
 };
 
-const symbolContractKeys: Array<keyof SymbolContractData> = [
+type PriceRow = {
+  expirationPrice: number;
+  call: ContractMetrics;
+  put: ContractMetrics;
+};
+
+type ContractSet = {
+  expirationTime: number;
+  optionPriceList: PriceRow[];
+};
+
+type OutputRow = {
+  price: number;
+  call: ContractMetrics;
+  put: ContractMetrics;
+  koe: number;
+};
+
+const metricKeys: Array<keyof ContractMetrics> = [
   "leverage",
   "bidIV",
   "askIV",
@@ -30,49 +45,73 @@ const symbolContractKeys: Array<keyof SymbolContractData> = [
   "amount",
 ];
 
-type SymbolData = {
-  expirationTime: number;
-  optionPriceList: Array<{
-    expirationPrice: number;
-    call: SymbolContractData;
-    put: SymbolContractData;
-  }>;
-};
+const tf12h = tfMs("1h", 12);
 
-const getSymbolClosestContractData = async (symbolId: string) => {
+const fetchContracts = async (symbolId: string): Promise<ContractSet[]> => {
   const url = `https://www.binance.com/bapi/eoptions/v1/public/eoptions/exchange/tGroup?contract=${symbolId}`;
-
   const res = await fetch(url);
-  const data = await res.json();
-  const arr = (data.data || []) as SymbolData[];
-
-  return minBy(arr, (d) => d.expirationTime);
+  const json = await res.json();
+  return (json?.data ?? []) as ContractSet[];
 };
 
-const extractContractData = (data: SymbolContractData) => {
-  return pick(data, symbolContractKeys);
+const blendMetrics = (
+  a: ContractMetrics | undefined,
+  b: ContractMetrics | undefined,
+  factor: number
+): ContractMetrics => {
+  return Object.fromEntries(
+    metricKeys.map((key) => {
+      const aVal = a?.[key] ?? 0;
+      const bVal = b?.[key] ?? 0;
+      return [key, aVal * factor + bVal * (1 - factor)];
+    })
+  ) as ContractMetrics;
 };
 
-const collectSymboData = async (symbolId: string) => {
+const isZeroMetrics = (m: ContractMetrics): boolean =>
+  metricKeys.every((key) => m[key] === 0);
+
+const computeKoe = (now: number, t1: number, t2?: number): number => {
+  if (now + tf12h < t1 || !t2) return 1;
+  const p = (now + tf12h - t1) / (t2 - t1);
+  return 1 - Math.max(0, Math.min(1, p));
+};
+
+const blendContracts = (contracts: ContractSet[], now: number): OutputRow[] => {
+  const [c1, c2] = sortBy(contracts, (d) => d.expirationTime);
+  if (!c1) return [];
+
+  const koe = computeKoe(now, c1.expirationTime, c2?.expirationTime);
+  const list1 = keyBy(c1.optionPriceList, (row) => row.expirationPrice);
+  const list2 = keyBy(c2?.optionPriceList ?? [], (row) => row.expirationPrice);
+
+  const allPrices = union(Object.keys(list1), Object.keys(list2)).map(Number);
+
+  return allPrices
+    .map((price) => {
+      const row1 = list1[price];
+      const row2 = list2[price];
+      const call = blendMetrics(row1?.call, row2?.call, koe);
+      const put = blendMetrics(row1?.put, row2?.put, koe);
+      return { price, koe, call, put };
+    })
+    .filter((row) => !isZeroMetrics(row.call) || !isZeroMetrics(row.put));
+};
+
+const processSymbol = async (symbolId: string): Promise<void> => {
   try {
-    const contractData = await getSymbolClosestContractData(symbolId);
-    if (!contractData) return;
-    const data = contractData.optionPriceList.map((d) => {
-      return {
-        price: d.expirationPrice,
-        call: extractContractData(d.call),
-        put: extractContractData(d.put),
-      };
-    });
-
-    await appendDataFile(`data/opts/${symbolId}.json`, data);
-  } catch (error) {
-    console.log(error)
+    const contracts = await fetchContracts(symbolId);
+    const output = blendContracts(contracts, time);
+    if (output.length) {
+      await appendDataFile(`data/opts/${symbolId}.json`, output);
+    }
+  } catch (err) {
+    console.error(`Failed to collect data for ${symbolId}:`, err);
   }
 };
 
-export const collectOptsData = async () => {
+export const collectOptsData = async (): Promise<void> => {
   for (const symbol of symbols) {
-    await collectSymboData(symbol.id);
+    await processSymbol(symbol.id);
   }
 };
