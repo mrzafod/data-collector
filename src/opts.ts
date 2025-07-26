@@ -72,8 +72,8 @@ const isZeroMetrics = (m: ContractMetrics): boolean =>
   metricKeys.every((key) => m[key] === 0);
 
 const computeKoe = (now: number, t1: number, t2?: number): number => {
-  if (now + tf12h < t1 || !t2) return 1;
-  const p = (now + tf12h - t1) / (t2 - t1);
+  if (!t2 || now < t1) return 1;
+  const p = (now - t1) / (t2 - t1);
   return 1 - Math.max(0, Math.min(1, p));
 };
 
