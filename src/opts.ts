@@ -71,10 +71,12 @@ const blendMetrics = (
 const isZeroMetrics = (m: ContractMetrics): boolean =>
   metricKeys.every((key) => m[key] === 0);
 
+const H12 = 12 * 60 * 60 * 1000;
+
 const computeKoe = (now: number, t1: number, t2?: number): number => {
-  if (!t2 || now < t1) return 1;
-  const p = (now - t1) / (t2 - t1);
-  return 1 - Math.max(0, Math.min(1, p));
+  if (!t2 || now < t1 - H12) return 1;
+  if (now >= t1) return 0;
+  return (t1 - now) / H12;
 };
 
 const blendContracts = (contracts: ContractSet[], now: number): OutputRow[] => {
