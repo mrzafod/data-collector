@@ -31,8 +31,13 @@ jobs:
       # 3. Copy /data from cdn to main working directory
       - name: Copy data from cdn to main
         run: |
-          rm -rf data
-          cp -r cdn-branch/data data
+          if [ -d cdn-branch/data ]; then
+            rm -rf data
+            cp -r cdn-branch/data data
+          else
+            echo "cdn-branch/data not found; keeping the checked-in data tree from main"
+          fi
+          mkdir -p data/opts
           find data -type f -name '*.json' -delete
 
       # 4. Build & run app — it will update /data
@@ -44,6 +49,7 @@ jobs:
       - name: Copy updated data to cdn branch
         run: |
           rm -rf cdn-branch/data
+          mkdir -p cdn-branch
           cp -r data cdn-branch/data
           find cdn-branch/data -type f -name '*.json' -delete
 
