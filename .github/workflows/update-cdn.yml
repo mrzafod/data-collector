@@ -48,6 +48,7 @@ jobs:
 
       # 5. Copy updated /data back to cdn-branch folder
       - name: Copy updated data to cdn branch
+        if: always()
         run: |
           rm -rf cdn-branch/data
           mkdir -p cdn-branch
@@ -56,6 +57,7 @@ jobs:
 
       # 6. Commit and push to cdn branch
       - name: Commit and push to cdn
+        if: always()
         run: |
           cd cdn-branch
           git config user.name "github-actions[bot]"

@@ -319,10 +319,7 @@ const collectBinanceData = async (): Promise<boolean> => {
       fetchBinanceTickers(),
     ]);
   } catch (err) {
-    console.error(
-      `Failed to collect Binance option metadata:`,
-      err
-    );
+    console.warn(`Skipping Binance for this run:`, err);
     return false;
   }
 
