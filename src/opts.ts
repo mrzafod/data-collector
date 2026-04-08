@@ -24,16 +24,20 @@ const MONTHS: Record<string, string> = {
   DEC: "12",
 };
 
-const BYBIT_BASE_URLS = Array.from(
-  new Set([
-    process.env.BYBIT_BASE_URL,
-    "https://api.bybit.com",
-    "https://api.bytick.com",
-  ].filter((value): value is string => Boolean(value)))
-);
+const parseBaseUrls = (): string[] => {
+  const envList = process.env.BYBIT_BASE_URLS?.split(",").map((value) => value.trim());
+  const single = process.env.BYBIT_BASE_URL?.trim();
+  const defaults = ["https://api.bytick.com", "https://api.bybit.com"];
+
+  return Array.from(
+    new Set([...(envList ?? []), ...(single ? [single] : []), ...defaults].filter(Boolean))
+  );
+};
+
+const BYBIT_BASE_URLS = parseBaseUrls();
 
 const fetchOptionTickers = async (baseCoin: string): Promise<TickerRow[]> => {
-  let lastError: unknown;
+  const attempts: string[] = [];
 
   for (const baseUrl of BYBIT_BASE_URLS) {
     const url = new URL("/v5/market/tickers", baseUrl);
@@ -67,13 +71,15 @@ const fetchOptionTickers = async (baseCoin: string): Promise<TickerRow[]> => {
 
       return (json?.result?.list ?? []) as TickerRow[];
     } catch (err) {
-      lastError = err;
+      attempts.push(
+        `${baseUrl}: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`Failed to fetch Bybit tickers for ${baseCoin}`);
+  throw new Error(
+    `Failed to fetch Bybit tickers for ${baseCoin}. Attempts: ${attempts.join(" | ")}`
+  );
 };
 
 const parseExpirationDate = (expirationCode: string): string => {
