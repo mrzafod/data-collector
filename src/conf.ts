@@ -1,6 +1,6 @@
 import { tfClamp } from "./time";
 
-export const symbols = [
+export const bybitSymbols = [
   "BTCUSDT",
   "ETHUSDT",
   "SOLUSDT",
@@ -8,5 +8,15 @@ export const symbols = [
   "DOGEUSDT",
 ] as const;
 
+export const binanceSymbols = [
+  "BTCUSDT",
+  "ETHUSDT",
+  "BNBUSDT",
+  "SOLUSDT",
+  "XRPUSDT",
+  "DOGEUSDT",
+] as const;
+
+export const exchanges = ["bybit", "binance"] as const;
+
 export const time = tfClamp("1m");
-export const minTime = tfClamp("1d", time, -5);

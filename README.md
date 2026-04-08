@@ -1,22 +1,25 @@
-# Bybit Options Collector
+# Options Collector
 
-This project fetches Bybit option prices on a schedule and stores the results as semicolon-delimited CSV files under `data/opts/`.
+This project fetches option prices on a schedule and stores them as append-only semicolon-delimited CSV files under `data/opts/`.
 
 ## Output Shape
 
-Each symbol gets its own file, for example `data/opts/SOLUSDT.csv`.
+Each exchange gets its own folder, and each symbol gets its own file:
+
+- `data/opts/bybit/SOLUSDT.csv`
+- `data/opts/binance/SOLUSDT.csv`
 
 Each row follows this structure:
 
 `SOLUSDT;<update_time>;<contract_name>;<expiration_date>;<contract_price>;<call_price>;<put_price>`
 
-The current collector groups Bybit call and put tickers by expiry and strike, then writes one row per pair.
+The collector groups call and put contracts by expiry and strike, then appends one row per pair.
 
 ## How It Runs
 
 - GitHub Actions runs the collector on a schedule.
-- The workflow copies the current `data/` tree from the `cdn` branch, refreshes the CSVs, and pushes the updated data back to `cdn`.
-- Old `.json` snapshots are removed during the migration, so the repo stays on the CSV format.
+- The workflow copies the current `data/` tree from the `cdn` branch when it exists, refreshes the CSVs, and pushes the updated data back to `cdn`.
+- The CSV writer appends new rows directly, so it does not reread the existing file before writing.
 
 ## Local Development
 
@@ -28,5 +31,5 @@ npm start
 
 ## Notes
 
-- The collector currently targets these symbols: `BTCUSDT`, `ETHUSDT`, `SOLUSDT`, `XRPUSDT`, and `DOGEUSDT`.
-- Bybit option prices come from the public V5 market ticker endpoint.
+- Bybit currently targets `BTCUSDT`, `ETHUSDT`, `SOLUSDT`, `XRPUSDT`, and `DOGEUSDT`.
+- Binance currently targets `BTCUSDT`, `ETHUSDT`, `BNBUSDT`, `SOLUSDT`, `XRPUSDT`, and `DOGEUSDT`.
