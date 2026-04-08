@@ -310,10 +310,21 @@ const collectBybitData = async (): Promise<boolean> => {
 const collectBinanceData = async (): Promise<boolean> => {
   let wroteAny = false;
 
-  const [metaRows, tickers] = await Promise.all([
-    fetchBinanceExchangeInfo(),
-    fetchBinanceTickers(),
-  ]);
+  let metaRows: BinanceOptionMeta[] = [];
+  let tickers: BinanceTickerRow[] = [];
+
+  try {
+    [metaRows, tickers] = await Promise.all([
+      fetchBinanceExchangeInfo(),
+      fetchBinanceTickers(),
+    ]);
+  } catch (err) {
+    console.error(
+      `Failed to collect Binance option metadata:`,
+      err
+    );
+    return false;
+  }
 
   for (const symbolId of binanceSymbols) {
     try {
@@ -343,13 +354,13 @@ export const collectOptsData = async (): Promise<void> => {
     failures.push(`binance: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  if (!wroteAny) {
-    throw new Error(
-      `No option data collected. ${failures.length ? `Errors: ${failures.join(" | ")}` : ""}`
-    );
-  }
-
   if (failures.length) {
     console.warn(`Completed with partial failures: ${failures.join(" | ")}`);
+  }
+
+  if (!wroteAny) {
+    console.warn(
+      `No option data collected${failures.length ? `; errors: ${failures.join(" | ")}` : ""}`
+    );
   }
 };
