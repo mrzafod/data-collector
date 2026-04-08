@@ -1,111 +1,147 @@
-import { sortBy, keyBy, union } from "lodash";
 import { symbols, time } from "./conf";
-import { appendDataFile } from "./files";
-import { tfMs } from "./time";
+import { appendCsvFile } from "./files";
 
-type ContractMetrics = {
-  leverage: number;
-  bidIV: number;
-  askIV: number;
-  delta: number;
-  theta: number;
-  gamma: number;
-  vega: number;
-  volume: number;
-  amount: number;
+type TickerRow = {
+  symbol: string;
+  lastPrice?: string;
+  bid1Price?: string;
+  ask1Price?: string;
+  markPrice?: string;
 };
 
-type PriceRow = {
-  expirationPrice: number;
-  call: ContractMetrics;
-  put: ContractMetrics;
+const MONTHS: Record<string, string> = {
+  JAN: "01",
+  FEB: "02",
+  MAR: "03",
+  APR: "04",
+  MAY: "05",
+  JUN: "06",
+  JUL: "07",
+  AUG: "08",
+  SEP: "09",
+  OCT: "10",
+  NOV: "11",
+  DEC: "12",
 };
 
-type ContractSet = {
-  expirationTime: number;
-  optionPriceList: PriceRow[];
-};
+const fetchOptionTickers = async (baseCoin: string): Promise<TickerRow[]> => {
+  const url = new URL("https://api.bybit.com/v5/market/tickers");
+  url.searchParams.set("category", "option");
+  url.searchParams.set("baseCoin", baseCoin);
 
-type OutputRow = {
-  price: number;
-  call: ContractMetrics;
-  put: ContractMetrics;
-  koe: number;
-};
-
-const metricKeys: Array<keyof ContractMetrics> = [
-  "leverage",
-  "bidIV",
-  "askIV",
-  "delta",
-  "theta",
-  "gamma",
-  "vega",
-  "volume",
-  "amount",
-];
-
-const tf12h = tfMs("1h", 12);
-
-const fetchContracts = async (symbolId: string): Promise<ContractSet[]> => {
-  const url = `https://www.binance.com/bapi/eoptions/v1/public/eoptions/exchange/tGroup?contract=${symbolId}`;
   const res = await fetch(url);
   const json = await res.json();
-  return (json?.data ?? []) as ContractSet[];
+
+  if (!res.ok || json?.retCode !== 0) {
+    throw new Error(json?.retMsg ?? `Failed to fetch Bybit tickers for ${baseCoin}`);
+  }
+
+  return (json?.result?.list ?? []) as TickerRow[];
 };
 
-const blendMetrics = (
-  a: ContractMetrics | undefined,
-  b: ContractMetrics | undefined,
-  factor: number
-): ContractMetrics => {
-  return Object.fromEntries(
-    metricKeys.map((key) => {
-      const aVal = a?.[key] ?? 0;
-      const bVal = b?.[key] ?? 0;
-      return [key, aVal * factor + bVal * (1 - factor)];
+const parseExpirationDate = (expirationCode: string): string => {
+  const match = expirationCode.match(/^(\d{1,2})([A-Z]{3})(\d{2})$/);
+
+  if (!match) {
+    throw new Error(`Unsupported expiration code: ${expirationCode}`);
+  }
+
+  const day = match[1].padStart(2, "0");
+  const month = MONTHS[match[2]];
+  const year = `20${match[3]}`;
+
+  if (!month) {
+    throw new Error(`Unsupported expiration code: ${expirationCode}`);
+  }
+
+  return `${year}-${month}-${day}`;
+};
+
+const parseOptionSymbol = (symbol: string) => {
+  const match = symbol.match(
+    /^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([CP])(?:-USDT)?$/
+  );
+
+  if (!match) {
+    throw new Error(`Unsupported Bybit option symbol: ${symbol}`);
+  }
+
+  return {
+    expirationCode: match[2],
+    strike: match[3],
+    side: match[4] as "C" | "P",
+  };
+};
+
+const getPrice = (ticker: TickerRow): number => {
+  const price = Number(ticker.lastPrice ?? ticker.markPrice ?? ticker.bid1Price ?? ticker.ask1Price ?? 0);
+  return Number.isFinite(price) ? price : 0;
+};
+
+const buildRows = (
+  symbolId: string,
+  tickers: TickerRow[]
+): Array<Array<string | number>> => {
+  type PairRow = {
+    expirationCode: string;
+    strike: string;
+    callPrice: number;
+    putPrice: number;
+  };
+
+  const rows = new Map<string, PairRow>();
+
+  for (const ticker of tickers) {
+    const parsed = parseOptionSymbol(ticker.symbol);
+    const key = `${parsed.expirationCode}:${parsed.strike}`;
+    const current = rows.get(key) ?? {
+      expirationCode: parsed.expirationCode,
+      strike: parsed.strike,
+      callPrice: 0,
+      putPrice: 0,
+    };
+
+    if (parsed.side === "C") {
+      current.callPrice = getPrice(ticker);
+    } else {
+      current.putPrice = getPrice(ticker);
+    }
+
+    rows.set(key, current);
+  }
+
+  return [...rows.values()]
+    .sort((a, b) => {
+      const expirationCompare = parseExpirationDate(
+        a.expirationCode
+      ).localeCompare(parseExpirationDate(b.expirationCode));
+      if (expirationCompare !== 0) return expirationCompare;
+      return Number(a.strike) - Number(b.strike);
     })
-  ) as ContractMetrics;
-};
+    .filter((row) => row.callPrice !== 0 || row.putPrice !== 0)
+    .map((row) => {
+      const expirationDate = parseExpirationDate(row.expirationCode);
+      const contractName = `${symbolId}-${row.expirationCode}-${row.strike}`;
 
-const isZeroMetrics = (m: ContractMetrics): boolean =>
-  metricKeys.every((key) => m[key] === 0);
-
-const H12 = 12 * 60 * 60 * 1000;
-
-const computeKoe = (now: number, t1: number, t2?: number): number => {
-  if (!t2 || now < t1 - H12) return 1;
-  if (now >= t1) return 0;
-  return (t1 - now) / H12;
-};
-
-const blendContracts = (contracts: ContractSet[], now: number): OutputRow[] => {
-  const [c1, c2] = sortBy(contracts, (d) => d.expirationTime);
-  if (!c1) return [];
-
-  const koe = computeKoe(now, c1.expirationTime, c2?.expirationTime);
-  const list1 = keyBy(c1.optionPriceList, (row) => row.expirationPrice);
-  const list2 = keyBy(c2?.optionPriceList ?? [], (row) => row.expirationPrice);
-
-  const allPrices = union(Object.keys(list1), Object.keys(list2)).map(Number);
-
-  return allPrices
-    .map((price) => {
-      const row1 = list1[price];
-      const row2 = list2[price];
-      const call = blendMetrics(row1?.call, row2?.call, koe);
-      const put = blendMetrics(row1?.put, row2?.put, koe);
-      return { price, koe, call, put };
-    })
-    .filter((row) => !isZeroMetrics(row.call) || !isZeroMetrics(row.put));
+      return [
+        symbolId,
+        time,
+        contractName,
+        expirationDate,
+        row.strike,
+        row.callPrice,
+        row.putPrice,
+      ];
+    });
 };
 
 const processSymbol = async (symbolId: string): Promise<void> => {
   try {
-    const contracts = await fetchContracts(symbolId);
-    const output = blendContracts(contracts, time);
+    const baseCoin = symbolId.replace(/USDT$/, "");
+    const tickers = await fetchOptionTickers(baseCoin);
+    const output = buildRows(symbolId, tickers);
     if (output.length) {
-      await appendDataFile(`data/opts/${symbolId}.json`, output);
+      await appendCsvFile(`data/opts/${symbolId}.csv`, output);
     }
   } catch (err) {
     console.error(`Failed to collect data for ${symbolId}:`, err);
@@ -114,6 +150,6 @@ const processSymbol = async (symbolId: string): Promise<void> => {
 
 export const collectOptsData = async (): Promise<void> => {
   for (const symbol of symbols) {
-    await processSymbol(symbol.id);
+    await processSymbol(symbol);
   }
 };

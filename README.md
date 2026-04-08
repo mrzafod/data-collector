@@ -1,58 +1,32 @@
-# Binance Options Aggregator
+# Bybit Options Collector
 
-This is a public module of a larger microservices trading intelligence platform. It collects and aggregates data from Binance Options markets to support quantitative trading strategies and decision-making.
+This project fetches Bybit option prices on a schedule and stores the results as semicolon-delimited CSV files under `data/opts/`.
 
-## What It Does
+## Output Shape
 
-- Fetches live and historical data from Binance Options.
-- Runs aggregation pipelines (IV curves, volume spreads, strikes, etc.) using **GitHub Actions** on a schedule.
-- Caches processed data in **GitHub Artifacts** for fast retrieval.
-- Publishes data snapshots via HTTP for use in frontend dashboards or downstream services.
-- Includes a dedicated frontend for data visualization built with **Observable notebooks** using [Plot](https://observablehq.com/@observablehq/plot) and **D3.js**.
+Each symbol gets its own file, for example `data/opts/SOLUSDT.csv`.
 
-## How It Works
+Each row follows this structure:
 
-- GitHub Actions automate the entire aggregation pipeline.
-- Output is stored in GitHub Artifacts and published to a static `cdn` branch (e.g. via GitHub Pages).
-- The frontend consumes this data and presents insights like IV surfaces, OI skews, strike distribution, etc.
+`SOLUSDT;<update_time>;<contract_name>;<expiration_date>;<contract_price>;<call_price>;<put_price>`
 
-## Frontend (Observable)
+The current collector groups Bybit call and put tickers by expiry and strike, then writes one row per pair.
 
-The frontend dashboard is powered by Observable notebooks:
-- Written in Observable JavaScript.
-- Uses `Plot` and `D3` to create interactive, dynamic visualizations.
-- Connects directly to the latest aggregated data via CDN.
+## How It Runs
 
-> Want to explore the live dashboards? Coming soon as a public Observable notebook!
+- GitHub Actions runs the collector on a schedule.
+- The workflow copies the current `data/` tree from the `cdn` branch, refreshes the CSVs, and pushes the updated data back to `cdn`.
+- Old `.json` snapshots are removed during the migration, so the repo stays on the CSV format.
 
-![Dashboard Screenshot 1](./static/screen01.png)
-![Dashboard Screenshot 1](./static/screen02.png)
+## Local Development
 
-## Use Cases
+```bash
+npm ci
+npm run build
+npm start
+```
 
-- Researching volatility behavior on Binance Options.
-- Detecting market anomalies in implied volatility curves.
-- Feeding aggregated features into your trading bots or ML models.
+## Notes
 
-## Data Access
-
-- Data is available via the GitHub Pages CDN (check `cdn/data` in this repo).
-- For performance and cost reasons, only aggregated public data is published.
-- Want deeper data or private aggregations? Reach out!
-
-## Get in Touch
-
-If you're interested in:
-- Custom/private aggregations
-- Collaborating on trading models
-- Using this pipeline in your stack
-
-Drop me a message on Telegram: [@mrzafod](https://t.me/mrzafod)
-
-## License
-
-MIT — free to use, modify, and build on. Attribution appreciated.
-
----
-
-_This project is a small window into a broader system of real-time and historical analytics for algorithmic trading._ 💡
+- The collector currently targets these symbols: `BTCUSDT`, `ETHUSDT`, `SOLUSDT`, `XRPUSDT`, and `DOGEUSDT`.
+- Bybit option prices come from the public V5 market ticker endpoint.

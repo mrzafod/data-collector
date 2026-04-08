@@ -2,7 +2,7 @@ name: Update CDN
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # every 5 minutes
+    - cron: '*/60 * * * *'  # every 60 minutes
   workflow_dispatch:
 
 jobs:
@@ -31,6 +31,7 @@ jobs:
         run: |
           rm -rf data
           cp -r cdn-branch/data data
+          find data -type f -name '*.json' -delete
 
       # 4. Build & run app — it will update /data
       - run: npm ci
@@ -42,6 +43,7 @@ jobs:
         run: |
           rm -rf cdn-branch/data
           cp -r data cdn-branch/data
+          find cdn-branch/data -type f -name '*.json' -delete
 
       # 6. Commit and push to cdn branch
       - name: Commit and push to cdn

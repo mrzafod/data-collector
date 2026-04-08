@@ -1,32 +1,41 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { minTime, time } from "./conf";
-import path from "node:path";
+import * as path from "path";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
-export const appendDataFile = async (
+const splitRows = (raw: string): string[] =>
+  raw.split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+
+const parseRowTime = (row: string): number => Number(row.split(";")[1]);
+
+export const appendCsvFile = async (
   fileRelativePath: string,
-  appendData: any[] = []
+  appendData: Array<Array<string | number>> = []
 ) => {
   const filePath = path.join(PROJECT_ROOT, fileRelativePath);
-  let fileData = [];
+  mkdirSync(path.dirname(filePath), { recursive: true });
+
+  let fileData: string[] = [];
   try {
     const raw = readFileSync(filePath, "utf8");
-    fileData = JSON.parse(raw);
-  } catch (error) {
-    console.log(error);
+    fileData = splitRows(raw);
+  } catch {
+    fileData = [];
   }
 
-  console.log(fileRelativePath, new Date(time), new Date(minTime))
+  const incomingRows = appendData.map((row) =>
+    row.map((value) => String(value)).join(";")
+  );
 
-  const jsonArray =
-    "[\n" +
-    appendData
-      .map((d) => Object.assign({ time }, d))
-      .concat(fileData.filter((d: any) => d.time >= minTime && d.time < time))
-      .map((item) => "  " + JSON.stringify(item))
-      .join(",\n") +
-    "\n]";
+  const existingRows = fileData.filter((row) => {
+    const rowTime = parseRowTime(row);
+    return Number.isFinite(rowTime) && rowTime >= minTime && rowTime < time;
+  });
 
-  writeFileSync(filePath, jsonArray);
+  const outputRows = [...incomingRows, ...existingRows];
+  writeFileSync(
+    filePath,
+    outputRows.length ? `${outputRows.join("\n")}\n` : ""
+  );
 };
