@@ -9,21 +9,22 @@ jobs:
   update-cdn:
     runs-on: ubuntu-latest
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       BYBIT_BASE_URLS: https://api.bytick.com,https://api.bybit.com
 
     steps:
       # 1. Checkout main (your app lives here)
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
 
       # 2. Checkout cdn branch separately (just for its /data)
       - name: Checkout cdn branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: cdn
           path: cdn-branch
