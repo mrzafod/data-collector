@@ -24,19 +24,56 @@ const MONTHS: Record<string, string> = {
   DEC: "12",
 };
 
+const BYBIT_BASE_URLS = Array.from(
+  new Set([
+    process.env.BYBIT_BASE_URL,
+    "https://api.bybit.com",
+    "https://api.bytick.com",
+  ].filter((value): value is string => Boolean(value)))
+);
+
 const fetchOptionTickers = async (baseCoin: string): Promise<TickerRow[]> => {
-  const url = new URL("https://api.bybit.com/v5/market/tickers");
-  url.searchParams.set("category", "option");
-  url.searchParams.set("baseCoin", baseCoin);
+  let lastError: unknown;
 
-  const res = await fetch(url);
-  const json = await res.json();
+  for (const baseUrl of BYBIT_BASE_URLS) {
+    const url = new URL("/v5/market/tickers", baseUrl);
+    url.searchParams.set("category", "option");
+    url.searchParams.set("baseCoin", baseCoin);
 
-  if (!res.ok || json?.retCode !== 0) {
-    throw new Error(json?.retMsg ?? `Failed to fetch Bybit tickers for ${baseCoin}`);
+    try {
+      const res = await fetch(url, {
+        headers: {
+          accept: "application/json",
+          "user-agent": "data-collector/1.0",
+        },
+      });
+      const body = await res.text();
+      const contentType = res.headers.get("content-type") ?? "";
+
+      if (!contentType.includes("json")) {
+        throw new Error(
+          `Unexpected content type ${contentType || "(missing)"} from ${baseUrl}: ${body.slice(0, 120)}`
+        );
+      }
+
+      const json = JSON.parse(body);
+
+      if (!res.ok || json?.retCode !== 0) {
+        throw new Error(
+          json?.retMsg ??
+            `Failed to fetch Bybit tickers for ${baseCoin} from ${baseUrl}`
+        );
+      }
+
+      return (json?.result?.list ?? []) as TickerRow[];
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  return (json?.result?.list ?? []) as TickerRow[];
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Failed to fetch Bybit tickers for ${baseCoin}`);
 };
 
 const parseExpirationDate = (expirationCode: string): string => {
@@ -145,11 +182,26 @@ const processSymbol = async (symbolId: string): Promise<void> => {
     }
   } catch (err) {
     console.error(`Failed to collect data for ${symbolId}:`, err);
+    throw err;
   }
 };
 
 export const collectOptsData = async (): Promise<void> => {
+  const failures: Array<{ symbol: string; error: unknown }> = [];
+
   for (const symbol of symbols) {
-    await processSymbol(symbol);
+    try {
+      await processSymbol(symbol);
+    } catch (error) {
+      failures.push({ symbol, error });
+    }
+  }
+
+  if (failures.length) {
+    throw new Error(
+      `Failed to collect data for ${failures.length} symbol(s): ${failures
+        .map(({ symbol, error }) => `${symbol} (${error instanceof Error ? error.message : String(error)})`)
+        .join(", ")}`
+    );
   }
 };

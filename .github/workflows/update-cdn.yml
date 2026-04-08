@@ -8,6 +8,8 @@ on:
 jobs:
   update-cdn:
     runs-on: ubuntu-latest
+    env:
+      BYBIT_BASE_URL: https://api.bytick.com
 
     steps:
       # 1. Checkout main (your app lives here)
