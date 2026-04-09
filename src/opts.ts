@@ -48,16 +48,22 @@ const MONTHS: Record<string, string> = {
 };
 
 const MONTH_NAMES = Object.fromEntries(
-  Object.entries(MONTHS).map(([name, num]) => [num, name])
+  Object.entries(MONTHS).map(([name, num]) => [num, name]),
 ) as Record<string, string>;
 
 const parseBaseUrls = (): string[] => {
-  const envList = process.env.BYBIT_BASE_URLS?.split(",").map((value) => value.trim());
+  const envList = process.env.BYBIT_BASE_URLS?.split(",").map((value) =>
+    value.trim(),
+  );
   const single = process.env.BYBIT_BASE_URL?.trim();
   const defaults = ["https://api.bytick.com", "https://api.bybit.com"];
 
   return Array.from(
-    new Set([...(envList ?? []), ...(single ? [single] : []), ...defaults].filter(Boolean))
+    new Set(
+      [...(envList ?? []), ...(single ? [single] : []), ...defaults].filter(
+        Boolean,
+      ),
+    ),
   );
 };
 
@@ -75,14 +81,16 @@ const fetchJsonText = async (url: string | URL) => {
 
   if (!contentType.includes("json")) {
     throw new Error(
-      `Unexpected content type ${contentType || "(missing)"} from ${url}: ${body.slice(0, 120)}`
+      `Unexpected content type ${contentType || "(missing)"} from ${url}: ${body.slice(0, 120)}`,
     );
   }
 
   return { res, body };
 };
 
-const fetchBybitOptionTickers = async (baseCoin: string): Promise<TickerRow[]> => {
+const fetchBybitOptionTickers = async (
+  baseCoin: string,
+): Promise<TickerRow[]> => {
   const attempts: string[] = [];
 
   for (const baseUrl of BYBIT_BASE_URLS) {
@@ -97,36 +105,42 @@ const fetchBybitOptionTickers = async (baseCoin: string): Promise<TickerRow[]> =
       if (!res.ok || json?.retCode !== 0) {
         throw new Error(
           json?.retMsg ??
-            `Failed to fetch Bybit tickers for ${baseCoin} from ${baseUrl}`
+            `Failed to fetch Bybit tickers for ${baseCoin} from ${baseUrl}`,
         );
       }
 
       return (json?.result?.list ?? []) as TickerRow[];
     } catch (err) {
       attempts.push(
-        `${baseUrl}: ${err instanceof Error ? err.message : String(err)}`
+        `${baseUrl}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
 
   throw new Error(
-    `Failed to fetch Bybit tickers for ${baseCoin}. Attempts: ${attempts.join(" | ")}`
+    `Failed to fetch Bybit tickers for ${baseCoin}. Attempts: ${attempts.join(" | ")}`,
   );
 };
 
 const fetchBinanceExchangeInfo = async (): Promise<BinanceOptionMeta[]> => {
-  const { res, body } = await fetchJsonText("https://eapi.binance.com/eapi/v1/exchangeInfo");
+  const { res, body } = await fetchJsonText(
+    "https://eapi.binance.com/eapi/v1/exchangeInfo",
+  );
   const json = JSON.parse(body);
 
   if (!res.ok || json?.code) {
-    throw new Error(json?.msg ?? "Failed to fetch Binance option exchange info");
+    throw new Error(
+      json?.msg ?? "Failed to fetch Binance option exchange info",
+    );
   }
 
   return (json?.optionSymbols ?? []) as BinanceOptionMeta[];
 };
 
 const fetchBinanceTickers = async (): Promise<BinanceTickerRow[]> => {
-  const { res, body } = await fetchJsonText("https://eapi.binance.com/eapi/v1/ticker");
+  const { res, body } = await fetchJsonText(
+    "https://eapi.binance.com/eapi/v1/ticker",
+  );
   const json = JSON.parse(body);
 
   if (!res.ok || json?.code) {
@@ -169,7 +183,7 @@ const formatDateCode = (dateMs: number): string => {
 
 const parseBybitSymbol = (symbol: string): BybitOptionMeta => {
   const match = symbol.match(
-    /^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([CP])(?:-USDT)?$/
+    /^([A-Z0-9]+)-(\d{1,2}[A-Z]{3}\d{2})-(\d+(?:\.\d+)?)-([CP])(?:-USDT)?$/,
   );
 
   if (!match) {
@@ -185,12 +199,20 @@ const parseBybitSymbol = (symbol: string): BybitOptionMeta => {
 };
 
 const getBybitPrice = (ticker: TickerRow): number => {
-  const price = Number(ticker.lastPrice ?? ticker.markPrice ?? ticker.bid1Price ?? ticker.ask1Price ?? 0);
+  const price = Number(
+    ticker.lastPrice ??
+      ticker.markPrice ??
+      ticker.bid1Price ??
+      ticker.ask1Price ??
+      0,
+  );
   return Number.isFinite(price) ? price : 0;
 };
 
 const getBinancePrice = (ticker?: BinanceTickerRow): number => {
-  const price = Number(ticker?.lastPrice ?? ticker?.bidPrice ?? ticker?.askPrice ?? 0);
+  const price = Number(
+    ticker?.lastPrice ?? ticker?.bidPrice ?? ticker?.askPrice ?? 0,
+  );
   return Number.isFinite(price) ? price : 0;
 };
 
@@ -201,11 +223,13 @@ const buildRows = (
     strike: string;
     callPrice: number;
     putPrice: number;
-  }>
+  }>,
 ): Array<Array<string | number>> => {
   return buckets
     .sort((a, b) => {
-      const dateCompare = parseDateCode(a.expiryCode).localeCompare(parseDateCode(b.expiryCode));
+      const dateCompare = parseDateCode(a.expiryCode).localeCompare(
+        parseDateCode(b.expiryCode),
+      );
       if (dateCompare !== 0) return dateCompare;
       return Number(a.strike) - Number(b.strike);
     })
@@ -221,10 +245,15 @@ const buildRows = (
     ]);
 };
 
-const collectBybitSymbol = async (symbolId: string): Promise<Array<Array<string | number>>> => {
+const collectBybitSymbol = async (
+  symbolId: string,
+): Promise<Array<Array<string | number>>> => {
   const baseCoin = symbolId.replace(/USDT$/, "");
   const tickers = await fetchBybitOptionTickers(baseCoin);
-  const rows = new Map<string, { expiryCode: string; strike: string; callPrice: number; putPrice: number }>();
+  const rows = new Map<
+    string,
+    { expiryCode: string; strike: string; callPrice: number; putPrice: number }
+  >();
 
   for (const ticker of tickers) {
     const parsed = parseBybitSymbol(ticker.symbol);
@@ -251,10 +280,15 @@ const collectBybitSymbol = async (symbolId: string): Promise<Array<Array<string 
 const collectBinanceSymbol = async (
   symbolId: string,
   metaRows: BinanceOptionMeta[],
-  tickers: BinanceTickerRow[]
+  tickers: BinanceTickerRow[],
 ): Promise<Array<Array<string | number>>> => {
-  const rows = new Map<string, { expiryCode: string; strike: string; callPrice: number; putPrice: number }>();
-  const tickerBySymbol = new Map(tickers.map((ticker) => [ticker.symbol, ticker]));
+  const rows = new Map<
+    string,
+    { expiryCode: string; strike: string; callPrice: number; putPrice: number }
+  >();
+  const tickerBySymbol = new Map(
+    tickers.map((ticker) => [ticker.symbol, ticker]),
+  );
 
   for (const meta of metaRows) {
     if (meta.underlying !== symbolId || meta.status !== "TRADING") continue;
@@ -285,7 +319,7 @@ const collectBinanceSymbol = async (
 const appendExchangeSymbol = async (
   exchange: (typeof exchanges)[number],
   symbolId: string,
-  rows: Array<Array<string | number>>
+  rows: Array<Array<string | number>>,
 ) => {
   if (!rows.length) return false;
   await appendCsvFile(`data/opts/${exchange}/${symbolId}.csv`, rows);
@@ -298,7 +332,8 @@ const collectBybitData = async (): Promise<boolean> => {
   for (const symbolId of bybitSymbols) {
     try {
       const rows = await collectBybitSymbol(symbolId);
-      wroteAny = (await appendExchangeSymbol("bybit", symbolId, rows)) || wroteAny;
+      wroteAny =
+        (await appendExchangeSymbol("bybit", symbolId, rows)) || wroteAny;
     } catch (err) {
       console.error(`Failed to collect Bybit data for ${symbolId}:`, err);
     }
@@ -326,7 +361,8 @@ const collectBinanceData = async (): Promise<boolean> => {
   for (const symbolId of binanceSymbols) {
     try {
       const rows = await collectBinanceSymbol(symbolId, metaRows, tickers);
-      wroteAny = (await appendExchangeSymbol("binance", symbolId, rows)) || wroteAny;
+      wroteAny =
+        (await appendExchangeSymbol("binance", symbolId, rows)) || wroteAny;
     } catch (err) {
       console.error(`Failed to collect Binance data for ${symbolId}:`, err);
     }
@@ -348,7 +384,9 @@ export const collectOptsData = async (): Promise<void> => {
   try {
     wroteAny = (await collectBinanceData()) || wroteAny;
   } catch (err) {
-    failures.push(`binance: ${err instanceof Error ? err.message : String(err)}`);
+    failures.push(
+      `binance: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   if (failures.length) {
@@ -357,7 +395,7 @@ export const collectOptsData = async (): Promise<void> => {
 
   if (!wroteAny) {
     console.warn(
-      `No option data collected${failures.length ? `; errors: ${failures.join(" | ")}` : ""}`
+      `No option data collected${failures.length ? `; errors: ${failures.join(" | ")}` : ""}`,
     );
   }
 };

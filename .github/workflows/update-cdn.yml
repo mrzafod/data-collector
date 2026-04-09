@@ -2,7 +2,7 @@ name: Update CDN
 
 on:
   schedule:
-    - cron: '*/60 * * * *'  # every 60 minutes
+    - cron: "*/60 * * * *" # every 60 minutes
   workflow_dispatch:
 
 jobs:
@@ -10,12 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      BYBIT_BASE_URLS: https://api.bytick.com,https://api.bybit.com
 
     steps:
       # 1. Checkout main (your app lives here)
       - name: Checkout main
         uses: actions/checkout@v5
+
+      - name: Setup Cloudflare WARP
+        uses: fscarmen/warp-on-actions@v1.1
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
